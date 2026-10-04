@@ -25,7 +25,7 @@ from playwright.sync_api import sync_playwright, TimeoutError as PWTimeout
 URL = "https://konzinfobooking.mfa.gov.hu/"
 CONSULATE_LABEL = "Israel - Tel Aviv"
 CASE_TYPE_LABEL = "Citizenship applications"
-NO_APPOINTMENT_TEXT = "xxxxxx"
+NO_APPOINTMENT_TEXT = "We inform you that there are currently no appointments available"
 CODE_REQUEST_TEXT = "you need to enter the code that is sent to the provided email address"
 
 SLOW_MO_MS = 50
@@ -35,7 +35,8 @@ SCREENSHOT_PATH = "possible_slot.png"
 DETAILS = json.loads(os.environ["FORM_DETAILS_JSON"])
 SMTP_USER = os.environ.get("SMTP_USER", "")
 SMTP_APP_PASSWORD = os.environ.get("SMTP_APP_PASSWORD", "")
-ALERT_EMAIL_TO = os.environ.get("ALERT_EMAIL_TO", "")
+# One or more recipients, separated by commas: "a@gmail.com, b@gmail.com"
+ALERT_EMAIL_TO = [a.strip() for a in os.environ.get("ALERT_EMAIL_TO", "").split(",") if a.strip()]
 SMTP_HOST = os.environ.get("SMTP_HOST", "smtp.gmail.com")
 SMTP_PORT = int(os.environ.get("SMTP_PORT", "465"))
 
@@ -57,7 +58,7 @@ def send_email(subject, body, attachment_path=None):
         msg = EmailMessage()
         msg["Subject"] = subject
         msg["From"] = SMTP_USER
-        msg["To"] = ALERT_EMAIL_TO
+        msg["To"] = ", ".join(ALERT_EMAIL_TO)
         msg.set_content(body)
         if attachment_path and os.path.exists(attachment_path):
             with open(attachment_path, "rb") as f:
