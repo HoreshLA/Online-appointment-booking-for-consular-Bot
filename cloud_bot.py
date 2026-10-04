@@ -17,7 +17,7 @@ import smtplib
 import ssl
 import sys
 import traceback
-from datetime import datetime
+from datetime import datetime, timezone
 from email.message import EmailMessage
 
 from playwright.sync_api import sync_playwright, TimeoutError as PWTimeout
@@ -26,6 +26,7 @@ URL = "https://konzinfobooking.mfa.gov.hu/"
 CONSULATE_LABEL = "Israel - Tel Aviv"
 CASE_TYPE_LABEL = "Citizenship applications"
 NO_APPOINTMENT_TEXT = "We inform you that there are currently no appointments available"
+CODE_REQUEST_TEXT = "you need to enter the code that is sent to the provided email address"
 
 SLOW_MO_MS = 50
 SCREENSHOT_PATH = "possible_slot.png"
@@ -39,8 +40,13 @@ SMTP_HOST = os.environ.get("SMTP_HOST", "smtp.gmail.com")
 SMTP_PORT = int(os.environ.get("SMTP_PORT", "465"))
 
 
+def visible_text(page, text):
+    """True if the text is shown right now on the page (ignores hidden copies)."""
+    return page.get_by_text(text).filter(visible=True).count() > 0
+
+
 def log(message):
-    print(f"[{datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')} UTC] {message}", flush=True)
+    print(f"[{datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')} UTC] {message}", flush=True)
 
 
 def send_email(subject, body, attachment_path=None):
@@ -123,12 +129,23 @@ def main():
                 page.wait_for_timeout(500)
             btn.click()
 
-            try:
-                page.get_by_text(NO_APPOINTMENT_TEXT).wait_for(state="visible", timeout=10000)
+            # Wait up to 15s for the site to answer. The "no appointments" text also
+            # exists hidden elsewhere on the page, so only visible matches count.
+            state = "unknown"
+            for _ in range(30):
+                if visible_text(page, NO_APPOINTMENT_TEXT):
+                    state = "no_slot"
+                    break
+                if visible_text(page, CODE_REQUEST_TEXT):
+                    state = "code_requested"
+                    break
+                page.wait_for_timeout(500)
+
+            if state == "no_slot":
                 log("Checked: no appointments available right now.")
                 return 0
-            except PWTimeout:
-                pass  # popup did not appear -> possible slot
+
+            log(f"Site answered with state: {state} (NOT the usual 'no appointments' popup)")
 
             page.screenshot(path=SCREENSHOT_PATH, full_page=True)
             log("!!! POSSIBLE APPOINTMENT SLOT DETECTED !!!")
