@@ -25,7 +25,7 @@ from playwright.sync_api import sync_playwright, TimeoutError as PWTimeout
 URL = "https://konzinfobooking.mfa.gov.hu/"
 CONSULATE_LABEL = "Israel - Tel Aviv"
 CASE_TYPE_LABEL = "Citizenship applications"
-NO_APPOINTMENT_TEXT = "We inform you that there are currently no appointments available"
+NO_APPOINTMENT_TEXT = "XXX"
 CODE_REQUEST_TEXT = "you need to enter the code that is sent to the provided email address"
 
 SLOW_MO_MS = 50
