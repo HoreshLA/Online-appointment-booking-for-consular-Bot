@@ -39,6 +39,7 @@ SMTP_APP_PASSWORD = os.environ.get("SMTP_APP_PASSWORD", "")
 ALERT_EMAIL_TO = [a.strip() for a in os.environ.get("ALERT_EMAIL_TO", "").split(",") if a.strip()]
 SMTP_HOST = os.environ.get("SMTP_HOST", "smtp.gmail.com")
 SMTP_PORT = int(os.environ.get("SMTP_PORT", "465"))
+BOT_LABEL = DETAILS.get("label", "Citizenship")   # shows in the email subject, e.g. "Passport"
 
 
 def visible_text(page, text):
@@ -88,7 +89,10 @@ def fill_booking_form(page):
     # Choose case type
     page.get_by_role("button", name="Select type of application").click()
     page.wait_for_selector("#modalCases", state="visible")
-    page.get_by_text(CASE_TYPE_LABEL, exact=True).first.click()
+    if "case_type" in d:   # custom case type (e.g. passport): partial match inside the modal
+        page.locator("#modalCases").get_by_text(d["case_type"], exact=False).first.click()
+    else:                  # default: citizenship
+        page.get_by_text(CASE_TYPE_LABEL, exact=True).first.click()
     page.get_by_role("button", name="Save").click()
     page.wait_for_load_state("networkidle")
 
@@ -102,12 +106,17 @@ def fill_booking_form(page):
     page.get_by_label("Phone number", exact=True).fill(d["phone"])
     page.get_by_label("Email address", exact=True).fill(d["email"])
     page.get_by_label("Re-enter the email address", exact=True).fill(d["email"])
-    page.get_by_label("Name of your case-handler", exact=False).fill(d["case_handler"])
-    page.get_by_label("How many documents do you have in total for legalization", exact=False).fill(
-        str(d["num_documents"]))
-    page.get_by_label("How many forms do you have in total with your application", exact=False).fill(
-        str(d["num_forms"]))
-    page.get_by_label("Are declaration of paternity forms included", exact=False).fill(d["paternity"])
+    # Extra fields exist only for some case types - fill them only if provided
+    if d.get("case_handler") is not None:
+        page.get_by_label("Name of your case-handler", exact=False).fill(d["case_handler"])
+    if d.get("num_documents") is not None:
+        page.get_by_label("How many documents do you have in total for legalization", exact=False).fill(
+            str(d["num_documents"]))
+    if d.get("num_forms") is not None:
+        page.get_by_label("How many forms do you have in total with your application", exact=False).fill(
+            str(d["num_forms"]))
+    if d.get("paternity") is not None:
+        page.get_by_label("Are declaration of paternity forms included", exact=False).fill(d["paternity"])
 
     # Consent checkboxes
     page.get_by_text("I have read and acknowledged the information related to the procedure").click()
@@ -151,10 +160,10 @@ def main():
             page.screenshot(path=SCREENSHOT_PATH, full_page=True)
             log("!!! POSSIBLE APPOINTMENT SLOT DETECTED !!!")
             send_email(
-                "🚨 Hungary Consulate: possible appointment slot found!",
+                f"🚨 Hungary Consulate ({BOT_LABEL}): possible appointment slot found!",
                 "The 'no appointments available' popup did NOT appear.\n"
                 "Go to the site NOW and finish the booking yourself:\n" + URL + "\n\n"
-                "(The site will ask for a code sent to your email - keep an eye on that inbox.)",
+                f"(The site will ask for a code sent to {DETAILS['email']} - keep an eye on that inbox.)",
                 SCREENSHOT_PATH,
             )
             return 1
